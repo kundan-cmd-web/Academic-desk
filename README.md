@@ -27,7 +27,7 @@ After updating source files while the PWA is already open, refresh the page once
 
 Academic Desk stores events, deadlines, and submissions in IndexedDB on each device, so core functionality continues without a network connection. When a network is available, you can optionally configure Google Drive in **Settings** and use **Data backup & sync** to upload the current database or restore it on another device.
 
-Google Drive holds a private JSON backup in its application-data folder. It is used only when you explicitly press upload or restore. While offline, the same dashboard, calendar, searches, reports, JSON backup/restore, and ICS import/export remain available locally.
+Google Drive holds a private JSON backup in its application-data folder. You can enable **Automatically sync changes when online** in Settings after connecting the same Google account on each device. The app merges event and submission records using their latest update time before saving the shared backup. A Google sign-in may still be required on each device. While offline, the same dashboard, calendar, searches, reports, JSON backup/restore, and ICS import/export remain available locally.
 
 ## Verification
 
