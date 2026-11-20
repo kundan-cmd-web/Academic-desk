@@ -45,5 +45,6 @@ async function mergedGoogleSync(mode='sync',silent=false){if(!navigator.onLine){
 function backup(){return backupOnline()}
 function settings(){settingsOnline();let connect=$('#connectDrive');if(connect)connect.onclick=()=>mergedGoogleSync('sync')}
 function updateConnection(){let online=navigator.onLine;$('#connection').textContent=online?'Online · local data saved':'Offline · local data saved';$('#connection').className='connection '+(online?'online':'offline');$('#syncText').textContent=online?'Online. Local data can sync to Google Drive.':'Offline mode. All core tools stay available locally.'}
+const driveFetch=window.fetch.bind(window);window.fetch=(input,init={})=>{let url=typeof input==='string'?input:input?.url;if(init.method==='PATCH'&&url?.includes('/upload/drive/v3/files/')&&typeof init.body==='string')init={...init,body:init.body.replace(/,"parents":\["appDataFolder"\]/,'')};return driveFetch(input,init)}
 init();
 
