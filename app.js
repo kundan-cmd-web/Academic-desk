@@ -51,7 +51,6 @@ function loadOcr(){return new Promise((resolve,reject)=>{if(window.Tesseract)ret
 const driveFetch=window.fetch.bind(window);window.fetch=(input,init={})=>{let url=typeof input==='string'?input:input?.url;if(init.method==='PATCH'&&url?.includes('/upload/drive/v3/files/')&&typeof init.body==='string')init={...init,body:init.body.replace(/,"parents":\["appDataFolder"\]/,'')};return driveFetch(input,init)}
 // Shared Lab Workspace. Personal events remain only in IndexedDB; these records
 // live in Firestore and are available to every invited browser session.
-NAV.splice(NAV.findIndex(([key])=>key==='notifications'),0,['lab','Lab workspace']);
 let baseRender=render,labSdk,labUser,labAdmin=localStorage.getItem('academic-desk-lab-admin')==='true',labState={members:[],events:[],updates:[],announcements:[],reminders:[]},labUnsubscribers=[];
 render=()=>{if(route==='lab'){renderNav();$('#pageTitle').textContent='Lab Workspace Dashboard';labWorkspace();return}baseRender()};
 const labEsc=esc,labColor=uid=>`hsl(${[...String(uid||'guest')].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7)%360} 70% 43%)`,labTime=v=>v?.toDate?v.toDate().toLocaleString():v?new Date(v).toLocaleString():'Just now';
