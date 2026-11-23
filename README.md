@@ -49,4 +49,4 @@ The project deliberately does not include real login credentials, email delivery
 
 The **Lab workspace** page uses Firebase guest accounts and Cloud Firestore. Lab members only need the public app link: the first visit creates a local guest identity and they choose a display name. Shared events, reminders, announcements, and activity updates appear immediately on other connected devices and remain cached for offline viewing and later synchronization.
 
-The first workspace visitor becomes its administrator. Open the public app from your own browser before sharing it with others. The administrator can change display names and remove shared records. Personal events and submissions remain in each member's local IndexedDB database.
+The workspace owner should open the public app first and select **Claim administrator** before sharing it with others. The administrator can change display names and remove shared records. Personal events and submissions remain in each member's local IndexedDB database.
