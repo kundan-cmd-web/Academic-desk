@@ -44,3 +44,9 @@ Manual checks: create, edit, duplicate, delete, and search an event; add multipl
 ## Known integration boundary
 
 The project deliberately does not include real login credentials, email delivery, or a database endpoint. Those require your chosen identity provider, hosting location, mail provider, and PostgreSQL credentials. No credential is exposed in the client.
+
+## Shared Lab Workspace
+
+The **Lab workspace** page uses Firebase guest accounts and Cloud Firestore. Lab members only need the public app link: the first visit creates a local guest identity and they choose a display name. Shared events, reminders, announcements, and activity updates appear immediately on other connected devices and remain cached for offline viewing and later synchronization.
+
+The first workspace visitor becomes its administrator. Open the public app from your own browser before sharing it with others. The administrator can change display names and remove shared records. Personal events and submissions remain in each member's local IndexedDB database.

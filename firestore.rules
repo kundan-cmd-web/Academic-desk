@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/labSettings/admin)
+        && get(/databases/$(database)/documents/labSettings/admin).data.uid == request.auth.uid;
+    }
+    match /labSettings/admin {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/labSettings/admin)
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    match /labMembers/{memberId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == memberId
+        && request.resource.data.role == 'member';
+      allow update: if signedIn() && (isAdmin() || (request.auth.uid == memberId
+        && request.resource.data.role == resource.data.role));
+      allow delete: if isAdmin();
+    }
+    match /labEvents/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (isAdmin() || (resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId));
+      allow delete: if signedIn() && (isAdmin() || resource.data.authorId == request.auth.uid);
+    }
+    match /labReminders/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (isAdmin() || (resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId));
+      allow delete: if signedIn() && (isAdmin() || resource.data.authorId == request.auth.uid);
+    }
+    match /labAnnouncements/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (isAdmin() || (resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId));
+      allow delete: if signedIn() && (isAdmin() || resource.data.authorId == request.auth.uid);
+    }
+    match /labUpdates/{recordId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (isAdmin() || (resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId));
+      allow delete: if signedIn() && (isAdmin() || resource.data.authorId == request.auth.uid);
+    }
+  }
+}
