@@ -121,5 +121,96 @@ let mobileLayoutStyle=document.createElement('style');mobileLayoutStyle.textCont
 let bindWithMobileDrawer=bind;bind=()=>{bindWithMobileDrawer();let sidebar=$('.sidebar'),menu=$('#menuButton'),close=document.createElement('button'),backdrop=document.createElement('button');sidebar.id='mobileNavigation';menu.setAttribute('aria-controls',sidebar.id);menu.setAttribute('aria-expanded','false');close.type='button';close.className='drawer-close';close.textContent='Close menu ×';close.setAttribute('aria-label','Close navigation');sidebar.prepend(close);backdrop.type='button';backdrop.className='drawer-backdrop';backdrop.setAttribute('aria-label','Close navigation');backdrop.hidden=true;document.body.append(backdrop);let setOpen=(open,restoreFocus=true)=>{sidebar.classList.toggle('open',open);backdrop.hidden=!open;menu.setAttribute('aria-expanded',String(open));if(open)close.focus();else if(restoreFocus)menu.focus()};menu.onclick=()=>setOpen(!sidebar.classList.contains('open'));close.onclick=backdrop.onclick=()=>setOpen(false);sidebar.addEventListener('click',event=>{if(event.target.closest('a'))setOpen(false)});document.addEventListener('keydown',event=>{if(!sidebar.classList.contains('open'))return;if(event.key==='Escape'){event.preventDefault();setOpen(false)}if(event.key==='Tab'){let controls=[...sidebar.querySelectorAll('a,button,input,select,textarea')].filter(x=>!x.disabled&&x.getClientRects().length),first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}});window.addEventListener('hashchange',()=>setOpen(false,false));window.matchMedia('(max-width:850px)').addEventListener('change',()=>setOpen(false,false))};
 let drawerStyle=document.createElement('style');drawerStyle.textContent='.drawer-close,.drawer-backdrop{display:none}@media(max-width:850px){.drawer-close{display:block;align-self:flex-end;background:#ffffff20;color:white;padding:10px 12px;border-radius:7px;margin-bottom:14px}.drawer-backdrop:not([hidden]){display:block;position:fixed;inset:0;background:#10204788;z-index:9}.sidebar.open{z-index:10}}';document.head.append(drawerStyle);
 $('#quickAdd').textContent='+ Add personal event';
+const reminderIntervals = new Set([30, 15, 7, 3, 1, 0]);
+function calendarReminderDue(date) {
+  return reminderIntervals.has(days(date));
+}
+
+const renderPersonalReminders = notifications;
+notifications = () => {
+  renderPersonalReminders();
+  const rows = deadlines().filter(d =>
+    !['Completed', 'Archived'].includes(d.status) && calendarReminderDue(d.date)
+  );
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.style.marginTop = '16px';
+  panel.innerHTML = '<h2>Calendar reminders due today</h2>' + deadlineItems(rows);
+  view.append(panel);
+};
+
+const renderLabProfile = paintLab;
+paintLab = () => {
+  renderLabProfile();
+  if (route !== 'lab' || !labUser) return;
+  const hero = $('.topbar .lab-hero');
+  if (!hero) return;
+
+  const profile = document.createElement('details');
+  profile.className = 'compact-profile';
+  const avatar = document.createElement('summary');
+  const name = labState.members.find(member => member.id === labUser.uid)?.displayName || 'Guest';
+  const photoKey = 'academic-desk-avatar-' + labUser.uid;
+  avatar.textContent = name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
+  avatar.setAttribute('aria-label', 'Profile for ' + name);
+  const showPhoto = source => {
+    const image = document.createElement('img');
+    image.src = source;
+    image.alt = '';
+    avatar.replaceChildren(image);
+  };
+  const savedPhoto = localStorage.getItem(photoKey);
+  if (savedPhoto) showPhoto(savedPhoto);
+  hero.before(profile);
+  profile.append(avatar, hero);
+  const photo = document.createElement('input');
+  photo.type = 'file';
+  photo.accept = 'image/png,image/jpeg,image/webp';
+  const photoLabel = document.createElement('label');
+  photoLabel.textContent = 'Profile photo on this device';
+  photoLabel.append(photo);
+  hero.append(photoLabel);
+  photo.onchange = () => {
+    const file = photo.files[0];
+    if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 512000) {
+      alert('Choose a PNG, JPEG or WebP photo smaller than 500 KB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        localStorage.setItem(photoKey, reader.result);
+        showPhoto(reader.result);
+      } catch { alert('This browser could not save the profile photo.'); }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const shared = labState.events.flatMap(event => [
+    {title:event.title, type:'Event', date:event.startDate || (!event.sourcePersonalId ? event.date : '')},
+    ...submissionDatesForLab(event).filter(d => !['Completed','Archived'].includes(d.status))
+      .map(d => ({title:event.title, type:d.type, date:d.date}))
+  ]).filter(d => d.date && calendarReminderDue(d.date));
+  const panel = $('#addLabReminder')?.closest('.lab-panel');
+  if (panel && shared.length) {
+    panel.insertAdjacentHTML('beforeend', '<h3>Calendar reminders due today</h3>' +
+      shared.map(d => `<p class="lab-item">${esc(d.title)} · ${esc(d.type)} · ${fmt(d.date)}</p>`).join(''));
+  }
+};
+
+const renderWithProfile = render;
+render = () => {
+  $('.topbar .compact-profile')?.remove();
+  renderWithProfile();
+};
+const paintWithProfile = paintLab;
+paintLab = () => {
+  $('.topbar .compact-profile')?.remove();
+  paintWithProfile();
+};
+const profileStyle = document.createElement('style');
+profileStyle.textContent = '.compact-profile{position:relative}.compact-profile summary{list-style:none;cursor:pointer;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#173ea5;color:white;font-weight:700}.compact-profile summary::-webkit-details-marker{display:none}.compact-profile img{width:100%;height:100%;object-fit:cover}.topbar .compact-profile .lab-hero{position:absolute;z-index:8;right:0;top:46px;display:grid;width:min(275px,80vw)}.topbar .compact-profile .lab-name{width:100%}.compact-profile label{color:white}.topbar .compact-profile input[type=file]{width:100%;display:block;font-size:12px}';
+profileStyle.textContent += '@media(max-width:850px){.topbar .compact-profile .lab-hero{left:0;right:auto}}';
+document.head.append(profileStyle);
 init();
 
