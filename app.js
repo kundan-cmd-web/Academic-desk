@@ -54,9 +54,9 @@ const driveFetch=window.fetch.bind(window);window.fetch=(input,init={})=>{let ur
 let baseRender=render,labSdk,labUser,labAdmin=localStorage.getItem('academic-desk-lab-admin')==='true',labState={members:[],events:[],updates:[],announcements:[],reminders:[]},labUnsubscribers=[];
 render=()=>{if(route==='lab'){renderNav();$('#pageTitle').textContent='Lab Workspace Dashboard';labWorkspace();return}baseRender()};
 const labEsc=esc,labColor=uid=>`hsl(${[...String(uid||'guest')].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7)%360} 70% 43%)`,labTime=v=>v?.toDate?v.toDate().toLocaleString():v?new Date(v).toLocaleString():'Just now';
-async function loadLabSdk(){if(labSdk)return labSdk;let config=await import('./lab-config.js');if(!config.labFirebaseConfig.apiKey||!config.labFirebaseConfig.appId)throw Error('The shared workspace is being configured. Please refresh in a minute.');let [app,auth,store]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js')]);let firebase=app.initializeApp(config.labFirebaseConfig),database=store.initializeFirestore(firebase,{localCache:store.persistentLocalCache({tabManager:store.persistentMultipleTabManager()})});let identity=auth.getAuth(firebase);if(!identity.currentUser)await auth.signInAnonymously(identity);labUser=identity.currentUser;labSdk={...store,db:database,auth:identity};return labSdk}
+async function loadLabSdk(){if(labSdk)return labSdk;let config=await import('./lab-config.js');if(!config.labFirebaseConfig.apiKey||!config.labFirebaseConfig.appId)throw Error('The shared workspace is being configured. Please refresh in a minute.');let [app,auth,store]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js')]);let firebase=app.initializeApp(config.labFirebaseConfig),database=store.initializeFirestore(firebase,{localCache:store.persistentLocalCache({tabManager:store.persistentMultipleTabManager()})});let identity=auth.getAuth(firebase);await identity.authStateReady();labUser=identity.currentUser;labSdk={...store,db:database,auth:identity,authApi:auth};return labSdk}
 function labWorkspace(){view.innerHTML='<section class="panel"><h2>Shared Lab Workspace</h2><p class="muted">Connecting your guest workspace…</p></section>';startLab().catch(error=>{view.innerHTML=`<section class="panel"><h2>Shared Lab Workspace</h2><p class="muted">${labEsc(error.message||'The workspace is unavailable while offline.')}</p><button class="secondary" id="retryLab">Retry</button></section>`;$('#retryLab').onclick=()=>labWorkspace()})}
-async function startLab(){let sdk=await loadLabSdk(),{db,doc,getDoc,setDoc,onSnapshot,collection}=sdk,memberRef=doc(db,'labMembers',labUser.uid),member=await getDoc(memberRef);if(!member.exists())await setDoc(memberRef,{displayName:localStorage.getItem('academic-desk-lab-name')||'Guest '+labUser.uid.slice(0,5),role:'member',createdAt:Date.now(),updatedAt:Date.now()});let admin=await getDoc(doc(db,'labSettings','admin'));labAdmin=admin.exists()&&admin.data().uid===labUser.uid;localStorage.setItem('academic-desk-lab-admin',String(labAdmin));labState.adminUnclaimed=!admin.exists();labUnsubscribers.forEach(stop=>stop());labUnsubscribers=[];let watch=(name,path)=>labUnsubscribers.push(onSnapshot(collection(db,path),snap=>{labState[name]=snap.docs.map(d=>({id:d.id,...d.data()}));paintLab()},error=>{console.error('Shared workspace sync:',error);labState.syncError='Shared data could not be loaded: '+error.message;paintLab()}));watch('members','labMembers');watch('events','labEvents');watch('updates','labUpdates');watch('announcements','labAnnouncements');watch('reminders','labReminders');paintLab()}
+async function startLab(){let sdk=await loadLabSdk();if(!labUser)throw Error('Sign in with your linked lab account.');let {db,doc,getDoc,setDoc,onSnapshot,collection}=sdk,memberRef=doc(db,'labMembers',labUser.uid),member=await getDoc(memberRef);if(!member.exists())throw Error('This account is not on the lab roster.');let admin=await getDoc(doc(db,'labSettings','admin'));labAdmin=admin.exists()&&admin.data().uid===labUser.uid;localStorage.setItem('academic-desk-lab-admin',String(labAdmin));labState.adminUnclaimed=!admin.exists();labUnsubscribers.forEach(stop=>stop());labUnsubscribers=[];let watch=(name,path)=>labUnsubscribers.push(onSnapshot(collection(db,path),snap=>{labState[name]=snap.docs.map(d=>({id:d.id,...d.data()}));paintLab()},error=>{console.error('Shared workspace sync:',error);labState.syncError='Shared data could not be loaded: '+error.message;paintLab()}));watch('members','labMembers');watch('events','labEvents');watch('updates','labUpdates');watch('announcements','labAnnouncements');watch('reminders','labReminders');paintLab()}
 function labCard(title,body,action=''){return `<section class="panel lab-panel"><div class="section-head"><h2>${title}</h2>${action}</div>${body}</section>`}
 let labOverviewFilter='upcoming';
 function labPersonalSummary(){let ds=[...labState.events.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date||'')).map(x=>({...x,deadline:x.date,kind:'event'})),...labState.reminders.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate||'')).map(x=>({...x,deadline:x.dueDate,kind:'reminder'}))].sort((a,b)=>a.deadline.localeCompare(b.deadline)),up=ds.filter(x=>!['Completed','Archived'].includes(x.status)&&days(x.deadline)>=0),shown=labOverviewFilter==='past'?ds.filter(x=>!['Completed','Archived'].includes(x.status)&&days(x.deadline)<0):labOverviewFilter==='week'?up.filter(x=>days(x.deadline)<=7):labOverviewFilter==='events'?ds.filter(x=>x.kind==='event'):up;return `<section class="panel lab-summary"><div class="section-head"><div><h2>Lab deadline overview</h2><p class="muted">Shared events and reminders from all lab members.</p></div></div>${labState.syncError?`<p class="muted">${esc(labState.syncError)}</p>`:''}<div class="cards compact-cards">${[[labState.events.length,'Shared events','events'],[up.length,'Upcoming dates','upcoming'],[up.filter(x=>days(x.deadline)<=7).length,'Due within 7 days','week'],[ds.filter(x=>days(x.deadline)<0).length,'Past dates','past']].map(([value,label,filter])=>`<button type="button" class="card stat lab-filter ${labOverviewFilter===filter?'selected':''}" data-lab-filter="${filter}" aria-pressed="${labOverviewFilter===filter}"><span>${label}</span><strong>${value}</strong><small>View dates</small></button>`).join('')}</div><div class="lab-overview-list">${shown.length?shown.map(x=>`<button type="button" class="lab-overview-row" data-lab-record="${esc(x.id)}" data-lab-kind="${x.kind}"><span class="lab-overview-text"><b>${esc(x.title)}</b><small>${fmt(x.deadline)} · ${esc(x.authorName||'Lab member')}</small></span><span class="deadline ${urgency(x.deadline)}">${days(x.deadline)<0?Math.abs(days(x.deadline))+'d ago':days(x.deadline)===0?'Today':days(x.deadline)+'d'}</span></button>`).join(''):'<p class="empty">No dates in this view.</p>'}</div></section>`}
@@ -212,5 +212,57 @@ const profileStyle = document.createElement('style');
 profileStyle.textContent = '.compact-profile{position:relative}.compact-profile summary{list-style:none;cursor:pointer;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#173ea5;color:white;font-weight:700}.compact-profile summary::-webkit-details-marker{display:none}.compact-profile img{width:100%;height:100%;object-fit:cover}.topbar .compact-profile .lab-hero{position:absolute;z-index:8;right:0;top:46px;display:grid;width:min(275px,80vw)}.topbar .compact-profile .lab-name{width:100%}.compact-profile label{color:white}.topbar .compact-profile input[type=file]{width:100%;display:block;font-size:12px}';
 profileStyle.textContent += '@media(max-width:850px){.topbar .compact-profile .lab-hero{left:0;right:auto}}';
 document.head.append(profileStyle);
+// Link on the original browser so Firebase retains the existing member ID.
+const openExistingLab = labWorkspace;
+labWorkspace = async () => {
+  try {
+    const sdk = await loadLabSdk();
+    if (route !== 'lab') return;
+    if (labUser) { openExistingLab(); return; }
+    view.innerHTML = '<section class="panel"><h2>Sign in to the lab</h2><p>Use the Google account linked to your existing lab profile.</p><button class="primary" id="googleLabSignIn">Sign in with Google</button><p id="labSignInStatus" role="status"></p></section>';
+    $('#googleLabSignIn').onclick = async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const {signInWithPopup, GoogleAuthProvider, signOut} = sdk.authApi;
+        const result = await signInWithPopup(sdk.auth, new GoogleAuthProvider());
+        const member = await sdk.getDoc(sdk.doc(sdk.db, 'labMembers', result.user.uid));
+        if (!member.exists()) {
+          await signOut(sdk.auth);
+          throw Error('Link this Google account from your original lab browser first.');
+        }
+        labUser = result.user;
+        render();
+      } catch (error) {
+        const status = $('#labSignInStatus');
+        if (status) status.textContent = error.message;
+      } finally { button.disabled = false; }
+    };
+  } catch (error) {
+    if (route === 'lab') view.textContent = error.message;
+  }
+};
+const paintLinkableProfile = paintLab;
+paintLab = () => {
+  paintLinkableProfile();
+  const profile = $('.compact-profile .lab-hero');
+  if (!profile || !labUser?.isAnonymous) return;
+  const link = document.createElement('button');
+  link.className = 'secondary';
+  link.textContent = 'Link Google account';
+  profile.append(link);
+  link.onclick = async () => {
+    link.disabled = true;
+    try {
+      const {linkWithPopup, GoogleAuthProvider} = labSdk.authApi;
+      const result = await linkWithPopup(labUser, new GoogleAuthProvider());
+      labUser = result.user;
+      link.textContent = 'Google account linked';
+    } catch (error) {
+      link.disabled = false;
+      alert(error.message);
+    }
+  };
+};
 init();
 

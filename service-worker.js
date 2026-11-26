@@ -1,4 +1,4 @@
-const CACHE='academic-desk-v26.11.26-3';
+const CACHE='academic-desk-v26.11.26-4';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./db.js','./lab-config.js','./manifest.webmanifest','./logo-192.png','./logo-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
